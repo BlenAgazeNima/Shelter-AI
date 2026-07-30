@@ -18,8 +18,8 @@ while True:
     for result in results:
         for box in result.boxes:
             class_id=int(box.cls[0]) #returns the class id of the detected object
-
-            if model.names[class_id] =="person":
+            confidence = float(box.conf[0])
+            if model.names[class_id] =="person" and confidence>=0.5:
                 person_count+=1
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
 
