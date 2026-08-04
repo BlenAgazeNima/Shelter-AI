@@ -1,0 +1,20 @@
+gdrfa_ai_shelter_fullstack/
+├── backend/
+│   ├── app/
+│   │   ├── main.py             FastAPI routes
+│   │   ├── video_processor.py  OpenCV + YOLO + ByteTrack + alert logic
+│   │   ├── database.py         SQLite functions
+│   │   └── health.py           Simulated sensor readings
+│   ├── videos/                 Included synthetic MP4 inputs
+│   ├── data/                   shelter.db created here
+│   ├── requirements.txt
+│   └── run.py
+├── frontend/
+│   ├── public/gdrfa-logo.png
+│   ├── src/App.jsx
+│   ├── src/styles.css
+│   ├── package.json
+│   └── vite.config.js
+├── SETUP_WINDOWS.bat
+├── START_PROJECT.bat
+└── README.md
