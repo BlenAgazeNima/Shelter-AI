@@ -28,6 +28,13 @@ The Python package installation and the first YOLO launch require internet acces
 
 Terminal 1:
 
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+
+
+TERMINAL 2:
+cd frontend
+npm run dev
+
 ```powershell
 py -3 -m venv .venv
 .venv\Scripts\activate
