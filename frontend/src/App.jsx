@@ -57,7 +57,7 @@ function AlertBadge({ severity }) {
   );
 }
 
-function App() {
+function App({ csrf = "" }) {
   const [cameras, setCameras] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [incidents, setIncidents] = useState([]);
@@ -310,7 +310,7 @@ function App() {
       try {
         await fetch(`${API}/alerts/${alert.id}/review`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
           body: JSON.stringify({ officer: "Operations Officer" })
         });
         await refresh();
@@ -332,7 +332,7 @@ function App() {
         `${API}/alerts/${selectedAlert.id}/verify`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
           body: JSON.stringify({
             officer: "Operations Officer",
             category: incidentCategory,
@@ -364,7 +364,7 @@ function App() {
         `${API}/alerts/${selectedAlert.id}/dismiss`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
           body: JSON.stringify({
             officer: "Operations Officer",
             reason: dismissalReason,
@@ -395,7 +395,7 @@ function App() {
         `${API}/incidents/${incidentId}/resolve`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
           body: JSON.stringify({
             officer: "Operations Officer",
             resolution_note: "Incident closed from command centre dashboard."

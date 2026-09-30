@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
+from .cases import router as cases_router, identity
+from .accounts import router as accounts_router
+from .case_support import router as support_router
+from .media import router as media_router, RecordedManager
+from .uaepass_sandbox import router as sandbox_router, seed_staff_identities
+from .security import router as security_router
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -21,14 +31,17 @@ from .database import (
     verify_alert,
 )
 from .health import current_health
-from .video_processor import ProcessorManager
-
-manager = ProcessorManager()
+if os.getenv('SHELTER_ENABLE_AI') == '1':
+    from .video_processor import ProcessorManager
+    manager = ProcessorManager()
+else:
+    manager = RecordedManager()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    seed_staff_identities()
     manager.start()
     yield
     manager.stop()
@@ -39,6 +52,29 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+app.include_router(cases_router)
+app.include_router(accounts_router)
+app.include_router(support_router)
+app.include_router(media_router)
+app.include_router(sandbox_router)
+app.include_router(security_router)
+
+
+@app.middleware("http")
+async def protect_employee_data(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and not path.startswith("/api/auth/") and path != "/api/health" and request.method != "OPTIONS":
+        try:
+            user = identity(request)
+            if not path.startswith(("/api/cases", "/api/accounts")) and user["role"] not in {"supervisor","security"}:
+                raise HTTPException(403, "This area requires shelter manager or security access")
+        except HTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    response = await call_next(request)
+    if path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -84,6 +120,17 @@ def api_health() -> dict:
 @app.get("/api/cameras")
 def cameras() -> list[dict]:
     return manager.states()
+
+
+@app.get("/api/cameras/{camera_id}/frame")
+def camera_frame(camera_id: str) -> Response:
+    processor = manager.get(camera_id)
+    if processor is None:
+        raise HTTPException(404, "YOLO is disabled for this feed")
+    frame = processor.state.latest_jpeg
+    if frame is None:
+        raise HTTPException(503, "Analysis is starting; please wait")
+    return Response(frame, media_type="image/jpeg")
 
 
 async def mjpeg_generator(camera_id: str) -> AsyncGenerator[bytes, None]:
@@ -133,7 +180,8 @@ def alert_details(alert_id: int) -> dict:
 
 
 @app.post("/api/alerts/{alert_id}/review")
-def review_alert(alert_id: int, payload: ReviewRequest) -> dict:
+def review_alert(alert_id: int, payload: ReviewRequest, request: Request) -> dict:
+    payload.officer = identity(request)["name"]
     alert = get_alert(alert_id)
 
     if alert is None:
@@ -146,7 +194,8 @@ def review_alert(alert_id: int, payload: ReviewRequest) -> dict:
 
 
 @app.post("/api/alerts/{alert_id}/verify")
-def verify_alert_endpoint(alert_id: int, payload: VerifyRequest) -> dict:
+def verify_alert_endpoint(alert_id: int, payload: VerifyRequest, request: Request) -> dict:
+    payload.officer = identity(request)["name"]
     incident_id = verify_alert(
         alert_id=alert_id,
         officer=payload.officer,
@@ -166,7 +215,8 @@ def verify_alert_endpoint(alert_id: int, payload: VerifyRequest) -> dict:
 
 
 @app.post("/api/alerts/{alert_id}/dismiss")
-def dismiss_alert_endpoint(alert_id: int, payload: DismissRequest) -> dict:
+def dismiss_alert_endpoint(alert_id: int, payload: DismissRequest, request: Request) -> dict:
+    payload.officer = identity(request)["name"]
     if not dismiss_alert(
         alert_id=alert_id,
         officer=payload.officer,
@@ -214,7 +264,9 @@ def incidents(limit: int = 100) -> list[dict]:
 def resolve_incident_endpoint(
     incident_id: int,
     payload: ResolveIncidentRequest,
+    request: Request,
 ) -> dict:
+    payload.officer = identity(request)["name"]
     if not resolve_incident(
         incident_id,
         payload.officer,
@@ -227,7 +279,7 @@ def resolve_incident_endpoint(
 
 @app.get("/api/residents/health")
 def resident_health() -> list[dict]:
-    return current_health()
+    return []  # No clinical sensor is connected. Never fabricate measurements.
 
 
 @app.get("/api/overview")
@@ -260,3 +312,8 @@ def overview() -> dict:
         ),
         "model": cameras_data[0]["model"] if cameras_data else "Unknown",
     }
+
+
+DIST = Path(__file__).resolve().parents[2] / 'frontend' / 'dist'
+if DIST.is_dir():
+    app.mount('/', StaticFiles(directory=DIST, html=True), name='website')

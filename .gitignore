@@ -1,1 +1,12 @@
 .venv/
+__pycache__/
+frontend/dist/
+.env
+shelter-users.json
+backend/data/cases.db*
+backend/tests/.test-data/
+.runtime/
+backend/data/operations.db*
+backend/data/documents/
+backend/data/sandbox-*.db*
+backend/data/sandbox-documents/

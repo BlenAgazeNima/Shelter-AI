@@ -10,6 +10,10 @@ from typing import Any
 
 import cv2
 import numpy as np
+import torch
+
+torch.set_num_threads(2)
+cv2.setNumThreads(1)
 
 from .database import create_alert
 
@@ -20,7 +24,7 @@ except Exception:  # pragma: no cover
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 VIDEO_DIR = BASE_DIR / "videos"
-MODEL_NAME = os.getenv("YOLO_MODEL", "yolo11n.pt")
+MODEL_NAME = os.getenv("SHELTER_YOLO_MODEL", str(BASE_DIR / "yolo11n.pt"))
 
 CAMERA_CONFIG = {
     "dining": {
@@ -73,8 +77,6 @@ def load_model() -> Any:
             _MODEL_ERROR = "Ultralytics is not installed. Run pip install -r requirements.txt"
             return None
         try:
-            if _MODEL is None:
-                _MODEL = YOLO(MODEL_NAME)
             return YOLO(MODEL_NAME)
         except Exception as exc:
             _MODEL_ERROR = str(exc)
@@ -113,6 +115,9 @@ class CameraState:
                 "confidence": round(self.confidence, 2),
                 "frame_number": self.frame_number,
                 "model": self.model_name,
+                "source": "recording",
+                "video_url": f"/api/media/{self.camera_id}",
+                "analysis_url": f"/api/cameras/{self.camera_id}/frame",
             }
 
 
@@ -157,7 +162,8 @@ class VideoProcessor:
             return
 
         source_fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
-        frame_delay = 1.0 / min(max(source_fps, 8), 30)
+        frame_delay = 0.25  # Four independent CPU feeds; avoid saturating the computer.
+        stride = max(1, round(source_fps * frame_delay))
         last_tick = time.perf_counter()
         smoothed_fps = 0.0
 
@@ -167,8 +173,14 @@ class VideoProcessor:
             if not ok:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 self.previous_gray = None
+                self.state.track_history.clear()
+                if model is not None and getattr(model, 'predictor', None):
+                    for tracker in getattr(model.predictor, 'trackers', []):
+                        tracker.reset()
                 continue
 
+            if frame.shape[1] > 640:
+                frame = cv2.resize(frame, (640, round(frame.shape[0] * 640 / frame.shape[1])))
             annotated = frame.copy()
             detections: list[dict[str, Any]] = []
 
@@ -182,8 +194,12 @@ class VideoProcessor:
                         iou=0.5,
                         tracker="bytetrack.yaml",
                         verbose=False,
+                        imgsz=640,
+                        device="cpu",
                     )
                     result = results[0]
+                    with self.state.lock:
+                        self.state.ai_status = "YOLO active"
                     boxes = result.boxes
                     if boxes is not None:
                         xyxy = boxes.xyxy.cpu().numpy()
@@ -206,6 +222,8 @@ class VideoProcessor:
                     with self.state.lock:
                         self.state.ai_status = f"YOLO error: {exc}"
 
+            with self.state.lock:
+                self.state.people = len(detections)
             self._draw_and_analyse(annotated, detections)
             self._draw_header(annotated)
 
@@ -219,11 +237,13 @@ class VideoProcessor:
                     self.state.latest_jpeg = encoded.tobytes()
                     self.state.people = len(detections)
                     self.state.fps = smoothed_fps
-                    self.state.status = "Live simulation"
+                    self.state.status = "Analysing recording"
                     self.state.frame_number += 1
 
             elapsed = time.perf_counter() - started
-            time.sleep(max(0.0, frame_delay - elapsed))
+            for _ in range(stride - 1):
+                cap.grab()
+            self.stop_event.wait(max(0.0, frame_delay - elapsed))
 
         cap.release()
 
@@ -269,7 +289,7 @@ class VideoProcessor:
                 cv2.polylines(frame, [points], False, (255, 190, 0), 2)
 
             color = (42, 179, 105)
-            label = f"Resident {track_id} {confidence:.0%}"
+            label = f"Person {track_id} {confidence:.0%}"
 
             if mode == "fall" and box_width / box_height > 1.15 and y2 > int(height * 0.62):
                 possible_fall = True
@@ -333,6 +353,9 @@ class ProcessorManager:
     def stop(self) -> None:
         for processor in self.processors.values():
             processor.stop()
+        for processor in self.processors.values():
+            if processor.thread.is_alive():
+                processor.thread.join(timeout=5)
 
     def states(self) -> list[dict[str, Any]]:
         return [processor.state.snapshot() for processor in self.processors.values()]

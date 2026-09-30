@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
-DB_PATH = Path(__file__).resolve().parents[1] / "data" / "shelter.db"
+DB_PATH = Path(os.getenv('SHELTER_OPERATIONS_DB',str(Path(__file__).resolve().parents[1] / 'data' / ('sandbox-operations.db' if os.getenv('SHELTER_AUTH_MODE')=='simulation' else 'operations.db'))))
 _DB_LOCK = Lock()
+
+
+@contextmanager
+def _connection():
+    conn=sqlite3.connect(DB_PATH)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _utc_now() -> str:
@@ -36,7 +48,7 @@ def _add_column_if_missing(
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS alerts (
@@ -92,7 +104,7 @@ def create_alert(
     confidence: float,
     details: str,
 ) -> int:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         cursor = conn.execute(
             """
             INSERT INTO alerts(camera_id, title, severity, confidence, details)
@@ -105,7 +117,7 @@ def create_alert(
 
 
 def list_alerts(limit: int = 50) -> list[dict[str, Any]]:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM alerts ORDER BY id DESC LIMIT ?",
@@ -115,7 +127,7 @@ def list_alerts(limit: int = 50) -> list[dict[str, Any]]:
 
 
 def get_alert(alert_id: int) -> dict[str, Any] | None:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT * FROM alerts WHERE id = ?",
@@ -125,7 +137,7 @@ def get_alert(alert_id: int) -> dict[str, Any] | None:
 
 
 def begin_review(alert_id: int, officer: str) -> bool:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         cursor = conn.execute(
             """
             UPDATE alerts
@@ -147,7 +159,7 @@ def verify_alert(
     action_taken: str,
     note: str,
 ) -> int | None:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         conn.row_factory = sqlite3.Row
         alert = conn.execute(
             "SELECT * FROM alerts WHERE id = ?",
@@ -227,7 +239,7 @@ def dismiss_alert(
     reason: str,
     note: str,
 ) -> bool:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         cursor = conn.execute(
             """
             UPDATE alerts
@@ -245,7 +257,7 @@ def dismiss_alert(
 
 
 def list_incidents(limit: int = 100) -> list[dict[str, Any]]:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM incidents ORDER BY id DESC LIMIT ?",
@@ -259,7 +271,7 @@ def resolve_incident(
     officer: str,
     resolution_note: str,
 ) -> bool:
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         cursor = conn.execute(
             """
             UPDATE incidents
@@ -277,7 +289,7 @@ def resolve_incident(
 
 def resolve_alert(alert_id: int, status: str, officer_note: str = "") -> bool:
     """Backward-compatible endpoint used by older frontend builds."""
-    with _DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+    with _DB_LOCK, _connection() as conn:
         cursor = conn.execute(
             "UPDATE alerts SET status = ?, officer_note = ? WHERE id = ?",
             (status, officer_note, alert_id),
