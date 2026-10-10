@@ -24,7 +24,6 @@ import {
   Bell,
 } from "lucide-react";
 import {
-  UaePassSandbox,
   PassMark,
   ResidentLogin,
   Monitoring,
@@ -34,6 +33,10 @@ import {
   CaseMessages,
 } from "./ServicePanels.jsx";
 import "./portal.css";
+import "./service-design.css";
+import CaseJourney from "./CaseJourney.jsx";
+import OperationsOverview from "./OperationsOverview.jsx";
+import UaePassGateway from "./UaePassGateway.jsx";
 
 function Field({ label, children, ...props }) {
   return (
@@ -128,6 +131,7 @@ function Resident({ record }) {
               : "In progress"}
         </Pill>
       </section>
+      {record.journey && <section className="p-card p-resident-journey"><p className="p-eyebrow">{ar ? "متابعة الملف" : "YOUR CASE PROGRESS"}</p><h2>{ar ? "الخطوات المكتملة والقادمة" : "Completed steps and what comes next"}</h2><ol className="p-case-stages">{record.journey.map((step, index) => <li key={step.stage} className={step.complete ? "complete" : "pending"}><span>{String(index + 1).padStart(2, "0")}</span><strong>{({identity: ar ? "مراجعة الهوية" : "Identity review", documents: ar ? "وثائق السفر" : "Travel documents", health: ar ? "الاستعداد الصحي" : "Health readiness", travel: ar ? "ترتيبات السفر" : "Travel arrangements"})[step.stage]}</strong><small>{step.complete ? (ar ? "مكتمل" : "Complete") : (ar ? "قيد المتابعة" : "Being coordinated")}</small></li>)}</ol><p className="p-help">{ar ? "يتابع الموظفون هذه الخطوات بالتوازي. تواصل مع موظف الحالة إذا احتجت إلى مساعدة." : "Staff coordinate these steps in parallel. Your case officer will let you know if anything is needed from you."}</p></section>}
       <div className="p-two">
         <section className="p-card">
           <h2>
@@ -196,6 +200,8 @@ function Resident({ record }) {
 }
 
 export default function Portal() {
+  const [readable, setReadable] = useState(() => localStorage.getItem("shelter-readable") === "1");
+  useEffect(() => { localStorage.setItem("shelter-readable", readable ? "1" : "0"); }, [readable]);
   const [user, setUser] = useState(null),
     [loading, setLoading] = useState(true),
     [configured, setConfigured] = useState(false),
@@ -423,9 +429,10 @@ export default function Portal() {
       <header className="p-header">
         <img src="/gdrfa-logo.png" alt="GDRFA Dubai" />
         <div className="p-brand">
-          <strong>Shelter services</strong>
-          <span>Care. Coordination. Safe departure.</span>
+          <strong>Al Awir</strong>
+          <span>Resident services & case management</span>
         </div>
+        <div className="p-accessibility"><button onClick={() => setReadable(!readable)} aria-pressed={readable} aria-label="Toggle larger reading text">Aa · Reading size</button></div>
         {user && (
           <div className="p-account">
             <span>
@@ -454,22 +461,20 @@ export default function Portal() {
   );
   if (loading)
     return (
-      <div className="portal">
+      <div className={"portal" + (readable ? " p-readable" : "")}>
         {header}
         <main className="p-loading">Loading shelter services…</main>
       </div>
     );
   if (!user)
     return (
-      <div className="portal">
+      <div className={"portal" + (readable ? " p-readable" : "")}>
         {header}
         <main className="p-landing">
           <section className="p-intro">
             <p className="p-eyebrow">GDRFA DUBAI · SHELTER SERVICES</p>
             <h1>
-              One connected journey.
-              <br />
-              <em>Care at every step.</em>
+              Resident services and case management
             </h1>
             <p>
               From arrival to safe departure, a shared record keeps support,
@@ -514,9 +519,7 @@ export default function Portal() {
             <h2>
               {setupRequired
                 ? "Set up shelter services"
-                : simulation
-                  ? "Continue to shelter services"
-                  : "Sign in to your account"}
+                : "Sign in to your account"}
             </h2>
             <p>
               {setupRequired
@@ -534,16 +537,13 @@ export default function Portal() {
             </div>}
             {audience==="resident" && <>
               <ResidentLogin api={api} onSession={u=>{setUser(u);setPage("overview");setError("");setSelected(null)}}/>
-              <div className="p-signin-divider">or sign in with your digital identity</div>
+              {(configured || simulation) && <div className="p-signin-divider">or sign in with your digital identity</div>}
             </>}
             {(audience || setupRequired) && <>
-              {simulation ? <>
-                <UaePassSandbox key={audience} audience={audience} api={api} onSession={u=>{setUser(u);setPage("overview");setError("");setSelected(null)}}/>
-                {audience==="employee"&&<details className="p-account-alternative"><summary>Employee login with username &amp; password</summary>{accountSignInForm}</details>}
-              </> : <>
-                {(audience==="employee"||setupRequired)&&accountSignInForm}
-                {!setupRequired&&<a className={`p-uae ${!configured?"disabled":""}`} href={configured?"/api/auth/login":undefined} aria-disabled={!configured} onClick={()=>{if(!configured)setError("UAE PASS is not connected. Please use your shelter account.")}}><PassMark small/>Sign in with UAE PASS</a>}
-              </>}
+              {!setupRequired&&simulation&&<UaePassGateway key={audience} audience={audience} api={api} onSession={u=>{setUser(u);setPage('overview');setError('');setSelected(null);}}/>}
+              {(audience==="employee"||setupRequired)&&(simulation&&!setupRequired ? <details className="p-account-alternative"><summary>Employee login with username &amp; password</summary>{accountSignInForm}</details> : accountSignInForm)}
+              {!setupRequired&&configured&&!simulation&&<a className="p-uae" href="/api/auth/login"><PassMark small/>Sign in with UAE PASS</a>}
+              {audience==="employee"&&!setupRequired&&<p className="p-help">Use the account issued by your shelter administrator. Your assigned permissions determine which services you can access.</p>}
             </>}
 
           </section>
@@ -554,7 +554,7 @@ export default function Portal() {
       </div>
     );
   return (
-    <div className="portal">
+    <div className={"portal" + (readable ? " p-readable" : "")}>
       {header}
       {error && (
         <div className="p-error" role="alert">
@@ -688,7 +688,7 @@ export default function Portal() {
                 }}
               />
             ) : page === "accounts" ? (
-              <Accounts api={api} records={records} user={user} />
+              <Accounts api={api} records={records} user={user} simulation={simulation} />
             ) : page === "profile" ? (
               <AccountSettings api={api} onSession={setUser} user={user} />
             ) : (
@@ -702,9 +702,9 @@ export default function Portal() {
                       {record
                         ? record.name
                         : {
-                            overview: "Shelter manager overview",
+                            overview: "Operations overview",
                             cases: "Resident records",
-                            tasks: "Work together. Keep things moving.",
+                            tasks: "Team work queue",
                             departures: "Departure readiness",
                           }[page]}
                     </h1>
@@ -733,6 +733,7 @@ export default function Portal() {
                     )}
                   </div>
                 </div>
+                {record && !admission && <CaseJourney record={record} />}
                 {admission ? (
                   <section className="p-card">
                     <div className="p-section-title">
@@ -1263,21 +1264,7 @@ export default function Portal() {
                         value={active.filter(ready).length}
                       />
                     </div>
-                    {page === "overview" && (
-                      <section className="p-welcome">
-                        <div>
-                          <p className="p-eyebrow">
-                            ONE RECORD, SHARED RESPONSIBILITY
-                          </p>
-                          <h2>A clear path from arrival to departure</h2>
-                          <p>
-                            Coordinate identity, consular support, medical
-                            readiness and travel in parallel.
-                          </p>
-                        </div>
-                        <ShieldCheck size={46} />
-                      </section>
-                    )}
+                    {page === "overview" && <OperationsOverview records={records} user={user} onOpen={(r, t) => {setSelected(r.id);setTab(t);}} onNavigate={(p, f="All") => {setPage(p);setSelected(null);setFilter(f);setSearch("");}} onAdmit={() => {setAdmission(true);setSelected(null);}} />}
                     {page === "tasks" ? (
                       <section className="p-card">
                         <h2>Team work queue</h2>

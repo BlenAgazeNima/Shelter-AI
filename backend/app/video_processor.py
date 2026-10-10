@@ -10,21 +10,25 @@ from typing import Any
 
 import cv2
 import numpy as np
-import torch
-
-torch.set_num_threads(2)
 cv2.setNumThreads(1)
 
 from .database import create_alert
 
-try:
-    from ultralytics import YOLO
-except Exception:  # pragma: no cover
-    YOLO = None
+ONNX_ENGINE = os.getenv('SHELTER_AI_ENGINE') == 'opencv'
+if ONNX_ENGINE:
+    from .onnx_detector import YOLO
+else:
+    import torch
+    torch.set_num_threads(2)
+    try:
+        from ultralytics import YOLO
+    except Exception:  # pragma: no cover
+        YOLO = None
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 VIDEO_DIR = BASE_DIR / "videos"
-MODEL_NAME = os.getenv("SHELTER_YOLO_MODEL", str(BASE_DIR / "yolo11n.pt"))
+MODEL_NAME = os.getenv("SHELTER_YOLO_MODEL", str(BASE_DIR / ("yolo11n.onnx" if ONNX_ENGINE else "yolo11n.pt")))
+TRACKER_NAME = 'Centroid tracking' if ONNX_ENGINE else 'ByteTrack'
 
 CAMERA_CONFIG = {
     "dining": {
@@ -35,8 +39,8 @@ CAMERA_CONFIG = {
         "capacity": 30,
     },
     "sleeping": {
-        "name": "Sleeping Area Camera 02",
-        "location": "Sleeping Area",
+        "name": "Care Area Camera 02",
+        "location": "Care Area",
         "video": "fall-detection.mp4",
         "mode": "fall",
         "capacity": 25,
@@ -250,7 +254,7 @@ class VideoProcessor:
     def _draw_header(self, frame: np.ndarray) -> None:
         height, width = frame.shape[:2]
         cv2.rectangle(frame, (0, 0), (width, 44), (15, 48, 44), -1)
-        label = f"{self.state.config['name']} | YOLO + ByteTrack | People: {self.state.people}"
+        label = f"{self.state.config['name']} | YOLO + {TRACKER_NAME} | People: {self.state.people}"
         cv2.putText(frame, label, (14, 29), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (255, 255, 255), 2)
         cv2.circle(frame, (width - 25, 22), 7, (41, 211, 120), -1)
 

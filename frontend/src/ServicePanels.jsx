@@ -207,7 +207,7 @@ export function AccountSettings({ api, onSession, user }) {
   );
 }
 
-export function Accounts({ api, records, user }) {
+export function Accounts({ api, records, user, simulation = false }) {
   const [accounts, setAccounts] = useState([]),
     [role, setRole] = useState("caseworker"),
     [error, setError] = useState(""),
@@ -321,8 +321,8 @@ export function Accounts({ api, records, user }) {
               </label>
             )}
             <Input
-              label="UAE PASS ID, email or phone (optional)"
-              name="identifier"
+              label={simulation ? "UAE PASS ID, email or phone (optional)" : "Verified UAE PASS UUID (optional)"}
+              name={simulation ? "identifier" : "uaepass_uuid"}
               maxLength={150}
             />
           </div>
@@ -608,7 +608,7 @@ export function Monitoring({ api, user }) {
       </div>
       <ErrorNotice error={error} />
       <div className="p-notice">
-        <label><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} /> Show YOLO detection on recordings</label>
+        <label><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} /> Show person detection on recordings</label>
         <p>Boxes and counts come from person detection. Safety alerts are possible concerns for officer review. Turn this off to pause or seek the original recording.</p>
       </div>
       {notice && (
@@ -651,7 +651,7 @@ export function Monitoring({ api, user }) {
             <p>
               {f.location} · {analysis && f.analysis_url ? "YOLO analysis of recorded footage" : "Original recording · pause, seek and full screen"}
             </p>
-            {analysis && !f.analysis_url && <p>YOLO is disabled. Run SETUP_AI.bat, then restart the backend.</p>}
+            {analysis && !f.analysis_url && <p>Person detection is not connected. Original recording playback remains available.</p>}
           </section>
         ))}
       </div>

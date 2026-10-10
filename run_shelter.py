@@ -35,9 +35,9 @@ def main():
             key=key.strip()
             if key.startswith(('UAEPASS_','SHELTER_')):
                 os.environ.setdefault(key,value.strip().strip('\"\''))
-    # The requested presentation uses an explicit sandbox, isolated from real records.
+    # Standard accounts are provisioned by the administrator. Simulation is opt-in.
     os.environ.setdefault('SHELTER_ENABLE_AI','1' if importlib.util.find_spec('ultralytics') else '0')
-    os.environ.setdefault('SHELTER_AUTH_MODE','simulation')
+    os.environ.setdefault('SHELTER_AUTH_MODE','real')
     if os.environ['SHELTER_AUTH_MODE']=='simulation':
         os.environ['SHELTER_CASE_DB']=str(ROOT/'backend'/'data'/'sandbox-cases.db')
         os.environ['SHELTER_OPERATIONS_DB']=str(ROOT/'backend'/'data'/'sandbox-operations.db')

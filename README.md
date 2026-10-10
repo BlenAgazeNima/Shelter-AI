@@ -1,6 +1,6 @@
 # GDRFA Shelter Services
 
-A connected shelter case platform with separate employee and resident interfaces, GDRFA styling, saved records, and an explicitly labelled UAE PASS sandbox for fictional presentation identities.
+A connected Al Awir case platform with employee and resident interfaces, persistent records, administrator-managed accounts, an operations overview and departure-readiness workflows.
 
 ## Run the website
 
@@ -30,21 +30,20 @@ py -3 run_frontend.py
 
 ## Sign-in flow
 
-1. Choose **Resident** or **Employee** first.
-2. For employee UAE PASS sign-in, enter a saved identity from the table below. Select the displayed number in the approval screen. Your saved name and role open the assigned workspace automatically.
-3. Residents use their shelter reference and access code, or a UAE PASS identifier linked by the manager. Both methods open only that resident's record.
-4. Managers issue resident codes and link identifiers under **People & permissions → Resident sign-in access**. The code is displayed once. The manager can also create additional employee accounts with an optional local UAE PASS identifier.
-5. Number requests expire after two minutes and can only be used once. Unknown, disabled or incorrectly matched identities cannot sign in.
+1. On an empty installation, create the first administrator account on the server computer. Existing accounts and records are preserved.
+2. Choose **Resident** or **Employee**. Employees sign in using their assigned username and password; saved roles determine their workspace.
+3. Managers create named accounts and assign permissions under **People & permissions**. No fixed employee identities are required by the standard launch configuration.
+4. Residents use their shelter reference and private access code, issued by the manager and linked to their own record.
+5. The external UAE PASS sign-in button appears only when provider credentials are configured and simulation is disabled. Provision a verified provider UUID for employee identity linkage.
 
-| Workspace | Identifier | Saved name |
-|---|---|---|
-| Shelter Manager | `manager@shelter.test` | Aisha Hassan |
-| Security Officer | `security@shelter.test` | Omar Ali |
-| Case Officer | `case@shelter.test` | Mariam Ahmed |
-| Medical Team | `medical@shelter.test` | Dr Sara Khalid |
-| Travel Coordinator | `travel@shelter.test` | Khalid Salem |
+The launcher defaults to `SHELTER_AUTH_MODE=real`. This checkout's local `.env` selects `SHELTER_AUTH_MODE=simulation` to provide the residency project's local UAE PASS experience: identifier entry, number approval, information sharing and welcome. Local accounts and records remain isolated in `sandbox-*.db`; existing records are not migrated or deleted. Employee roles follow saved accounts, and no mobile notification or external document retrieval occurs. Configuration alone does not certify a live UAE PASS connection.
 
-This local presentation flow does not contact UAE PASS or send phone notifications. These are fictional staff identities. It remains isolated in `sandbox-*.db`; the clean presentation UI does not change the authentication environment. Real UAE PASS integration remains a separate configuration.
+## Operations and case journey
+
+- The manager overview shows overdue/escalated checks, department completion counts, departure readiness and shortcuts to case, travel and safety work.
+- Each employee case shows the admission-to-departure stages and outstanding checks, owners, deadlines and missing travel details. Teams progress their tasks in parallel.
+- Resident progress exposes stage completion without internal task assignments or clinical notes.
+- Layouts adapt to desktop and mobile screens; larger reading text and reduced-motion preferences are supported.
 
 After backend code changes, stop the backend terminal with Ctrl+C and start it again. After frontend code changes, run `BUILD_WEBSITE.ps1` and refresh the browser.
 
@@ -85,3 +84,5 @@ Refresh the browser. The included Windows esbuild dependency compiles the fronte
 See `RESIDENT_PORTAL_SETUP.md` for switching off the simulator and configuring approved UAE PASS credentials. External permit issuance, airline booking, embassy communications and airport dispatch are recorded/managed workflows; they do not submit transactions to external agencies.
 
 The software is a local presentation/application build, not a production security certification. Real resident use requires institutional deployment/security review, managed data encryption/backups, retention controls and HTTPS.
+
+Local person detection uses YOLO11n ONNX through OpenCV (SHELTER_AI_ENGINE=opencv) on this computer because Windows blocks PyTorch. See REAL_FOOTAGE_SOURCES.md for the indoor recordings and model source. UAE PASS employee sign-in includes a manager identifier with Copy & use.

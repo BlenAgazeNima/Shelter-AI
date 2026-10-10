@@ -10,3 +10,5 @@ backend/data/operations.db*
 backend/data/documents/
 backend/data/sandbox-*.db*
 backend/data/sandbox-documents/
+
+backend/videos/originals/

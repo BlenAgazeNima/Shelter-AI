@@ -10,7 +10,7 @@ router=APIRouter(prefix='/api')
 VIDEOS=Path(__file__).resolve().parents[1]/'videos'
 FEEDS={
  'dining':('Dining hall','Dining Hall','dining-hall.mp4'),
- 'sleeping':('Sleeping area','Sleeping Area','fall-detection.mp4'),
+ 'sleeping':('Care area','Care Area','fall-detection.mp4'),
  'recreation':('Recreation room','Recreation Room','recreation-room.mp4'),
  'corridor':('Staff corridor','Staff Corridor','corridor.mp4'),
 }

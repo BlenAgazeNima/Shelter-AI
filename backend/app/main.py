@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import logging
+from importlib import import_module
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -31,11 +33,20 @@ from .database import (
     verify_alert,
 )
 from .health import current_health
-if os.getenv('SHELTER_ENABLE_AI') == '1':
-    from .video_processor import ProcessorManager
-    manager = ProcessorManager()
-else:
-    manager = RecordedManager()
+def create_video_manager():
+    if os.getenv('SHELTER_ENABLE_AI') == '1':
+        try:
+            return import_module('.video_processor', __package__).ProcessorManager()
+        except (ImportError, OSError) as exc:
+            # Optional native AI libraries may be unavailable or blocked by Windows.
+            # Keep casework and original recordings available without bypassing policy.
+            logging.getLogger(__name__).warning(
+                'Person detection unavailable; continuing with recording playback. %s', exc
+            )
+    return RecordedManager()
+
+
+manager = create_video_manager()
 
 
 @asynccontextmanager

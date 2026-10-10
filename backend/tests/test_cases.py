@@ -76,6 +76,21 @@ class CaseWorkflowTests(unittest.TestCase):
         self.assertEqual(self.update(record,'medical',{'notes':'Forbidden'}).status_code,403)
         self.assertEqual(self.update(record,'task',dict(id='medical',owner='Caseworker',due='2026-10-01',done=True,escalated=False)).status_code,403)
 
+    def test_resident_journey_tracks_clearances_without_internal_details(self):
+        record = self.admit()
+        record = self.update(record, 'task', dict(id='identity', owner='Internal employee', due='2026-10-01', done=True, escalated=False)).json()
+        record = self.update(record, 'medical', {'notes': 'Private clinical detail'}).json()
+        self.as_role('resident', record['id'])
+        public = self.client.get('/api/cases').json()[0]
+        self.assertEqual(public['journey'], [
+            {'stage': 'identity', 'complete': True},
+            {'stage': 'documents', 'complete': False},
+            {'stage': 'health', 'complete': False},
+            {'stage': 'travel', 'complete': False},
+        ])
+        self.assertNotIn('Internal employee', str(public))
+        self.assertNotIn('Private clinical detail', str(public))
+
     def test_version_conflict(self):
         record=self.admit()
         self.assertEqual(self.update(record,'update',dict(language='English',message='Your next step is document review.')).status_code,200)

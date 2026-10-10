@@ -1,14 +1,26 @@
-# Real footage included through automatic download
+# Indoor recordings and detection
 
-The setup script downloads four recordings from Wikimedia Commons and converts them to MP4 locally. The source pages contain the current licence and attribution details.
+The four feeds use licensed prerecorded stock footage of communal indoor spaces.
+They are not recordings of Al Awir residents or facilities. The interface labels
+these as recorded video. Original files remain in backend/videos/originals.
 
-| Dashboard feed | Source recording |
+| Feed | Pexels source |
 |---|---|
-| Occupancy / dining feed | People waiting to cross the street |
-| Fall feed | Falling man |
-| Recreation activity feed | Unserious fight on a birthday party |
-| Corridor / tracking feed | Big City Life |
+| Dining hall | https://www.pexels.com/video/18533896/ (Nazim Zafri) |
+| Care area | https://www.pexels.com/video/5203513/ |
+| Recreation room | https://www.pexels.com/video/31789801/ |
+| Staff corridor | https://www.pexels.com/video/6130553/ |
 
-The recordings contain real people and are prerecorded. OpenCV and YOLO process the resulting MP4 files frame by frame at runtime. They are used only to demonstrate the prototype pipeline and must not be presented as real GDRFA shelter footage.
+License: https://www.pexels.com/license/ permits application use and modification.
+Clips are shortened, resized and muted. Reinstall with the local AI Python and
+tools/install_indoor_footage.py. This replaces the previous outdoor/stunt clips.
 
-Source pages are recorded by `tools/download_real_footage.py` in `backend/videos/.real_footage_installed` after download.
+This computer blocks PyTorch shm.dll. The local .env selects SHELTER_AI_ENGINE=opencv
+and SHELTER_ENABLE_AI=1. OpenCV DNN runs YOLO11n ONNX person detection without
+changing Windows protections. Temporary centroid trajectory IDs are used instead
+of ByteTrack in this engine; they do not identify residents. Possible safety
+alerts require officer review; these clips do not validate fall detection.
+
+ONNX weights: https://huggingface.co/webnn/yolo11n (AGPL-3.0), derived from
+Ultralytics YOLO11. Stored at backend/yolo11n.onnx. Preserve licence obligations
+when distributing the application. Existing PyTorch weights remain available.

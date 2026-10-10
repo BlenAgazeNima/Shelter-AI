@@ -64,7 +64,12 @@ def project(record, user):
     if user["role"] == "resident":
         if user.get("case_id") != record["id"]:
             raise HTTPException(403, "This record is not assigned to you")
-        return {key: record[key] for key in ("id", "name", "language", "status", "updates", "travel", "updated")}
+        public = {key: record[key] for key in ("id", "name", "language", "status", "updates", "travel", "updated")}
+        # Expose stage completion only, never task owners, notes or legal details.
+        groups = [('identity', ['identity']), ('documents', ['consular', 'documents']), ('health', ['medical', 'fitness']), ('travel', ['permit', 'ticket', 'transfer'])]
+        checks = {task['id']: task['done'] for task in record['tasks']}
+        public['journey'] = [{'stage': stage, 'complete': all(checks.get(key, False) for key in keys)} for stage, keys in groups]
+        return public
     if user["role"] not in {"medical", "supervisor"}:
         record.pop("medical", None)
     return record
